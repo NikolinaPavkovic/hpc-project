@@ -67,8 +67,13 @@ int main()
         {0x64}};
     int n = sizeof(data) / HASH_LEN;
     printf("n = %d", n);
-    Node *root = create_tree((u_char **)data, n);
+
+    for (int i = 0; i < 4; i++)
+    {
+        printf("%hhn", data[i]);
+    }
+    /*Node *root = create_tree((u_char **)data, n);
     
-    free(root);
+    free(root);*/
     return 0;
 }
