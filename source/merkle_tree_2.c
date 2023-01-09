@@ -6,6 +6,7 @@
 
 #define BLOCK_SIZE 1024
 #define HASH_SIZE 32
+#define COUNT 10
 
 typedef struct node
 {
@@ -15,10 +16,11 @@ typedef struct node
 }node;
 
 void hash_data(unsigned char *data, int size, unsigned char *output) {
-    SHA256_CTX ctx;
+    /*SHA256_CTX ctx;
     SHA256_Init(&ctx);
     SHA256_Update(&ctx, data, size);
-    SHA256_Final(output, &ctx);
+    SHA256_Final(output, &ctx);*/
+    SHA256(data, HASH_SIZE, output);
 }
 
 void hash_data_new(unsigned char *left, unsigned char *right, unsigned char *output) {
@@ -36,7 +38,7 @@ node *create_node(unsigned char *hash, struct node *left, struct node *right) {
     return n;
 }
 
-node *create_tree(unsigned char **hashes, int count, int *counter) {
+/*node *create_tree(unsigned char **hashes, int count, int *counter) {
     if (count == 1) {
         return create_node(hashes[0], NULL, NULL);
     }
@@ -51,8 +53,8 @@ node *create_tree(unsigned char **hashes, int count, int *counter) {
         unsigned char *left = hashes[i];
         unsigned char *right = hashes[i + 1];
         unsigned char *new_hash = malloc(HASH_SIZE);
-        /*hash_data(left, HASH_SIZE, new_hash);
-        hash_data(right, HASH_SIZE, new_hash);*/
+        //hash_data(left, HASH_SIZE, new_hash);
+        //hash_data(right, HASH_SIZE, new_hash);
         hash_data_new(left, right, new_hash);
         new_hashes[j++] = new_hash;
     }
@@ -64,60 +66,37 @@ node *create_tree(unsigned char **hashes, int count, int *counter) {
     *counter += 1;
 
     return create_tree(new_hashes, j, counter);
-}
+}*/
 
-node *create_tree_new2(node **hashes, int count, int *counter) {
+node *create_tree_new2(node **nodes, int count, int *counter) {
     if (count == 1) {
-        return hashes[0];
+        return nodes[0];
     }
 
-    printf("Broj novih cvorova: %d\n", sizeof(hashes)/sizeof(hashes[0]));
+    /*printf("Broj novih cvorova: %d\n", sizeof(nodes)/sizeof(nodes[0]));
+    fflush(stdout);*/
 
     int i;
     int j = 0;
-    unsigned char **new_hashes = malloc(sizeof(node *) * (count+1)/2);
+    unsigned char **new_nodes = malloc(sizeof(node *) * (count+1)/2);
     for (i = 0; i < count - 1; i+=2)
     {
-        /*unsigned char *left = hashes[i];
-        unsigned char *right = hashes[i + 1];
-        unsigned char *new_hash = malloc(HASH_SIZE);
-        hash_data_new(left, right, new_hash);
-        new_hashes[j++] = new_hash;*/
         node *node = malloc(sizeof(struct node));
-        unsigned char *left = hashes[i];
-        unsigned char *right = hashes[i + 1];
+        unsigned char *left = nodes[i];
+        unsigned char *right = nodes[i + 1];
         hash_data_new(left, right, node->hash);
         node->left = left;
         node->right = right;
-        new_hashes[j++] = node;
-}
+        new_nodes[j++] = node;
+    }
 
     if(count % 2 == 1) {
-        new_hashes[j++] = hashes[count-1];
+        new_nodes[j++] = nodes[count-1];
     }
 
     *counter += 1;
 
-    return create_tree(new_hashes, j, counter);
-}
-
-node *create_tree_new(unsigned char **hashes, int count, int *counter) {
-    int i;
-    int j = 0;
-    node **nodes = malloc(sizeof(node *) * (count+1)/2);
-    for(int i = 0, j = 0; i < count; i += 2, j++) {
-        if (i != count - 1) {
-            node *node = malloc(sizeof(struct node));
-            unsigned char *left = hashes[i];
-            unsigned char *right = hashes[i + 1];
-            hash_data_new(left, right, node->hash);
-            node->left = left;
-            node->right = right;
-            nodes[j] = node;
-        } else {
-            nodes[j] = hashes[i];
-        }
-    }
+    return create_tree_new2(new_nodes, j, counter);
 }
 
 void free_tree(node *root) {
@@ -129,18 +108,24 @@ void free_tree(node *root) {
     free(root);
 }
 
-void print_tree(node *root, int depth) {
-    printf("USLO");
+void print_tree(node *root, int space) {
+    //printf("USLO\n");
     if (root == NULL) {
         return;
     }
 
-    printf("%d", *root->hash);
+    space += COUNT;
+
+    //printf("\n");
+    print_tree(root->right, space);
 
     printf("\n");
-    print_tree(root->left, depth+1);
-    printf(" ");
-    print_tree(root->right, depth+1);
+    for (int i = COUNT; i < space; i++)
+        printf(" ");
+    printf("%d\n", *root->hash);
+ 
+    //printf(" ");
+    print_tree(root->left, space);
 
 }
 
@@ -159,22 +144,17 @@ int count_nodes(int count){
 }
 
 int main() {
-    unsigned char data[4][HASH_SIZE] = {
+    unsigned char data[][HASH_SIZE] = {
     {'h'},
     {'t'},
+    {'f'},
+    {'b'},
+    {'f'},
     {'f'},
     {'b'}
     };
 
     int size = sizeof(data) / HASH_SIZE;
-
-    unsigned char *hashes[size];
-
-    for(int i = 0; i < size; i++) {
-        unsigned char *hash = malloc(HASH_SIZE);
-        hash_data(data[i], HASH_SIZE, hash);
-        hashes[i] = hash;
-    }
 
     node *first_level_nodes[size];
 
@@ -190,25 +170,39 @@ int main() {
 
     int counter = 0;
 
-    struct node *root = create_tree_new2(first_level_nodes, size, &counter);
+    node *root = create_tree_new2(first_level_nodes, size, &counter);
     
-    print_tree(root,1);
+    print_tree(root,0);
+
+    //verification
+
+    unsigned char data_proof[][HASH_SIZE] = {
+    {'h'},
+    {'t'},
+    {'f'},
+    {'b'},
+    {'f'},
+    {'f'},
+    {'b'},
+    {'f'}
+    };
 
 
-    /*unsigned char *hashes_proof[2];
+    node *first_level_nodes_proof[size];
 
-    for(int i = 0; i < 4; i++) {
+    for(int i = 0; i < size; i++) {
         unsigned char *hash = malloc(HASH_SIZE);
-        hash_data(data[i], HASH_SIZE, hash);
-        hashes_proof[i] = hash;
+        hash_data(data_proof[i], HASH_SIZE, hash);
+        first_level_nodes_proof[i] = hash;
     }
 
-    hash_data(root->hash, HASH_SIZE, hashes_proof);
-    if (memcmp(hashes_proof, root->hash, HASH_SIZE) == 0) {
-        printf("Data integrity verified\n");
+    node *new_root = create_tree_new2(first_level_nodes_proof, size, &counter);
+
+    if (memcmp(new_root->hash, root->hash, HASH_SIZE) == 0) {
+        printf("verified\n");
     } else {
-        printf("ERROR: Data has been modified\n");
-    }*/
+        printf("data has been modified\n");
+    }
 
     free_tree(root);
     return 0;
