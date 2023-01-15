@@ -120,7 +120,7 @@ Node *create_non_binary_tree_parallel(Node **nodes, int count) {
     }
     
     if(count % MAX_NUM_OF_CHILDREN != 0) {
-        for(int u = count & MAX_NUM_OF_CHILDREN; u > 0; u--) {
+        for(int u = count % MAX_NUM_OF_CHILDREN; u > 0; u--) {
             new_nodes[j++] = nodes[count - u];
         }
     }
@@ -201,7 +201,7 @@ int main() {
 
     printf("Trajanje paralelnog koda: %lf\n\n", end - start);
 
-    //print_tree(root, 0);
+    print_tree(root, 0);
 
     //verification
     unsigned char data_proof[][HASH_SIZE] = {
