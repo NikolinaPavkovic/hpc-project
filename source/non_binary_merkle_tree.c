@@ -19,12 +19,12 @@ void hash_data(unsigned char *data, int size, unsigned char *output) {
     SHA256(data, HASH_SIZE, output);
 }
 
-void hash_data_new(Node **nodes, unsigned char *output) {
-    u_char data[HASH_SIZE * MAX_NUM_OF_CHILDREN];
-    for (int i = 0; i < MAX_NUM_OF_CHILDREN; i++) {
+void hash_data_new(Node **nodes, unsigned char *output, int count) {
+    u_char data[HASH_SIZE * count];
+    for (int i = 0; i < count; i++) {
         memcpy(data + HASH_SIZE*i, nodes[i], HASH_SIZE);
     }
-    SHA256(data, HASH_SIZE * MAX_NUM_OF_CHILDREN, output);
+    SHA256(data, HASH_SIZE * count, output);
 }
 
 Node *return_if_less_than_max_left(Node **nodes, int count) {
@@ -37,57 +37,105 @@ Node *return_if_less_than_max_left(Node **nodes, int count) {
         hash_nodes[i] = nodes[i];
     }
 
-    hash_data_new(hash_nodes, node->hash);
+    hash_data_new(hash_nodes, node->hash, count);
 
     for(int i = 0; i < count; i++) {
         node->children[i] = nodes[i];
     }
 
-    //printf(" Node: %d\n", *node->hash);
-
     return node;
 }
 
-Node *create_non_binary_tree(Node **nodes, int count) {
-    //printf("USLO ");
+Node *create_non_binary_tree_sequential(Node **nodes, int count) {
     if(count == 1) {
         return nodes[0];
     } else if (count < MAX_NUM_OF_CHILDREN) {
-        //printf("TWO LEFT \n");
         return return_if_less_than_max_left(nodes, count);
     }
 
+    int i;
     int j = 0;
-    Node **new_nodes = malloc(sizeof(Node *) * (count+2)/MAX_NUM_OF_CHILDREN);
+    Node **new_nodes = malloc(sizeof(Node *) * (count + 2)/MAX_NUM_OF_CHILDREN);
     
     #pragma omp parallel for ordered
-    for(int i = 0; i < count - MAX_NUM_OF_CHILDREN + 1; i+=MAX_NUM_OF_CHILDREN) {
+    for(i = 0; i <= count - MAX_NUM_OF_CHILDREN; i += MAX_NUM_OF_CHILDREN) {
         Node *node = malloc(sizeof(Node));
         Node *hash_nodes[MAX_NUM_OF_CHILDREN];
         
         for(int u = 0; u < MAX_NUM_OF_CHILDREN; u++) {
             hash_nodes[u] = nodes[i+u];
         }
-        hash_data_new(hash_nodes, node->hash);
+        hash_data_new(hash_nodes, node->hash, MAX_NUM_OF_CHILDREN);
         
         for(int u = 0; u < MAX_NUM_OF_CHILDREN; u++) {
             node->children[u] = nodes[i+u];
         }
-        new_nodes[j++] = node;
-    }
 
-    //TODO: srediti ovo
-    if(count % 3 == 1) {
-        printf("OKI\n");
-        new_nodes[j++] = nodes[count - 1];
-    } else if (count % 3 == 2) {
-        new_nodes[j++] = nodes[count - 2];
-        new_nodes[j++] = nodes[count - 1];
+        #pragma omp ordered
+        {
+            new_nodes[j++] = node;
+        }
+    }
+    
+    if(count % MAX_NUM_OF_CHILDREN != 0) {
+        for(int u = count & MAX_NUM_OF_CHILDREN; u > 0; u--) {
+            new_nodes[j++] = nodes[count - u];
+        }
     }
 
     printf("\n\n");
 
-    return create_non_binary_tree(new_nodes, j);
+    return create_non_binary_tree_sequential(new_nodes, j);
+}
+
+Node *create_non_binary_tree_parallel(Node **nodes, int count) {
+    if(count == 1) {
+        return nodes[0];
+    } else if (count < MAX_NUM_OF_CHILDREN) {
+        return return_if_less_than_max_left(nodes, count);
+    }
+
+    int i;
+    int j = 0;
+    Node **new_nodes = malloc(sizeof(Node *) * (count + 2)/MAX_NUM_OF_CHILDREN);
+    
+    #pragma omp parallel for ordered
+    for(i = 0; i <= count - MAX_NUM_OF_CHILDREN; i += MAX_NUM_OF_CHILDREN) {
+        Node *node = malloc(sizeof(Node));
+        Node *hash_nodes[MAX_NUM_OF_CHILDREN];
+        
+        for(int u = 0; u < MAX_NUM_OF_CHILDREN; u++) {
+            hash_nodes[u] = nodes[i+u];
+        }
+        hash_data_new(hash_nodes, node->hash, MAX_NUM_OF_CHILDREN);
+        
+        for(int u = 0; u < MAX_NUM_OF_CHILDREN; u++) {
+            node->children[u] = nodes[i+u];
+        }
+
+        #pragma omp ordered
+        {
+            new_nodes[j++] = node;
+        }
+    }
+    
+    if(count % MAX_NUM_OF_CHILDREN != 0) {
+        for(int u = count & MAX_NUM_OF_CHILDREN; u > 0; u--) {
+            new_nodes[j++] = nodes[count - u];
+        }
+    }
+
+    //TODO: srediti ovo
+    /*if(count % 3 == 1) {
+        new_nodes[j++] = nodes[count - 1];
+    } else if (count % 3 == 2) {
+        new_nodes[j++] = nodes[count - 2];
+        new_nodes[j++] = nodes[count - 1];
+    }*/
+
+    printf("\n\n");
+
+    return create_non_binary_tree_parallel(new_nodes, j);
 }
 
 void free_tree(Node *root) {
@@ -125,20 +173,7 @@ void print_tree(Node *root, int space) {
 
 int main() {
     unsigned char data[][HASH_SIZE] = {
-    {'a'},
-    {'b'},
-    {'c'},
-    {'d'},
-    {'e'},
-    {'f'},
-    {'g'},
-    {'h'},
-    {'i'},
-    {'j'},
-    {'k'},
-    {'l'},
-    {'m'},
-    {'n'}
+    {'a'}, {'b'}, {'c'}, {'d'}, {'e'}, {'f'}, {'g'}, {'h'}, {'i'}, {'j'}, {'k'}, {'l'}, {'m'}, {'n'}, {'q'}, {'m'}, {'n'}, {'q'}
     };
 
     int size = sizeof(data) / HASH_SIZE;
@@ -150,17 +185,49 @@ int main() {
         hash_data(data[i], HASH_SIZE, node->hash);
         for(int j = 0; j < MAX_NUM_OF_CHILDREN; j++) {
             node->children[j] = NULL;
-            //printf("Child %d: %d\n", j, node->children[j]);
         }
         first_level_nodes[i] = node;
-        //printf("Hash: %d\n", *first_level_nodes[i]->hash);
     }
 
-    Node *root = create_non_binary_tree(first_level_nodes, size);
+    double end_seq, start_seq = omp_get_wtime();
+    Node *root_seq = create_non_binary_tree_sequential(first_level_nodes, size);
+    end_seq = omp_get_wtime();
 
-    print_tree(root, 0);
+    printf("Trajanje sekvencijalnog koda: %lf\n\n", end_seq - start_seq);
+
+    double end, start = omp_get_wtime();
+    Node *root = create_non_binary_tree_parallel(first_level_nodes, size);
+    end = omp_get_wtime();
+
+    printf("Trajanje paralelnog koda: %lf\n\n", end - start);
+
+    //print_tree(root, 0);
+
+    //verification
+    unsigned char data_proof[][HASH_SIZE] = {
+    {'a'}, {'b'}, {'c'}, {'d'}, {'e'}, {'f'}, {'g'}, {'h'}, {'i'}, {'j'}, {'k'}, {'l'}, {'m'}, {'n'}, {'q'}, {'m'}, {'n'}, {'q'}
+    };
+
+    Node *first_level_nodes_proof[size];
+
+    for(int i = 0; i < size; i++) {
+        Node *node = malloc(sizeof(Node));
+        hash_data(data_proof[i], HASH_SIZE, node->hash);
+        for(int j = 0; j < MAX_NUM_OF_CHILDREN; j++) {
+            node->children[j] = NULL;
+        }
+        first_level_nodes_proof[i] = node;
+    }
+
+    Node *new_root = create_non_binary_tree_parallel(first_level_nodes_proof, size);
+
+    if (memcmp(new_root->hash, root->hash, HASH_SIZE) == 0) {
+        printf("verified\n");
+    } else {
+        printf("data has been modified\n");
+    }
 
     free_tree(root);
-    
+    return 0;
 }
 

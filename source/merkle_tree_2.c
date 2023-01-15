@@ -35,7 +35,7 @@ node *create_tree_new2(node **nodes, int count) {
     int i;
     int j = 0;
     node **new_nodes = malloc(sizeof(node *) * (count+1)/2);
-    #pragma omp parallel for ordered 
+    #pragma omp parallel for ordered
     for (i = 0; i < count - 1; i+=2)
     {
         node *node = malloc(sizeof(struct node));
@@ -44,7 +44,10 @@ node *create_tree_new2(node **nodes, int count) {
         hash_data_new(left, right, node->hash);
         node->left = left;
         node->right = right;
-        new_nodes[j++] = node;
+        #pragma omp ordered
+        {
+            new_nodes[j++] = node;
+        }
     }
 
     if(count % 2 == 1) {
@@ -89,7 +92,9 @@ int main() {
     {'b'},
     {'f'},
     {'f'},
-    {'b'}
+    {'b'},
+    {'a'},
+    {'k'}
     };
 
     int size = sizeof(data) / HASH_SIZE;
@@ -104,14 +109,12 @@ int main() {
         first_level_nodes[i] = n;
     }
 
-    //printf("%d", sizeof(first_level_nodes)/sizeof(first_level_nodes[0]));
-
     node *root = create_tree_new2(first_level_nodes, size);
     
     print_tree(root,0);
 
-    //verification
 
+    //verification
     unsigned char data_proof[][HASH_SIZE] = {
     {'h'},
     {'t'},
@@ -120,7 +123,8 @@ int main() {
     {'f'},
     {'f'},
     {'b'},
-    {'f'}
+    {'a'},
+    {'k'}
     };
 
 
@@ -141,7 +145,6 @@ int main() {
     }
 
     free_tree(root);
-    //free_tree(new_root);
     return 0;
 
 }
