@@ -4,7 +4,6 @@
 #include <openssl/sha.h>
 #include <omp.h>
 
-#define BLOCK_SIZE 1024
 #define HASH_SIZE 32
 #define COUNT 10
 #define MAX_NUM_OF_CHILDREN 3
@@ -57,7 +56,6 @@ Node *create_non_binary_tree_sequential(Node **nodes, int count) {
     int j = 0;
     Node **new_nodes = malloc(sizeof(Node *) * (count + 2)/MAX_NUM_OF_CHILDREN);
     
-    #pragma omp parallel for ordered
     for(i = 0; i <= count - MAX_NUM_OF_CHILDREN; i += MAX_NUM_OF_CHILDREN) {
         Node *node = malloc(sizeof(Node));
         Node *hash_nodes[MAX_NUM_OF_CHILDREN];
@@ -70,15 +68,12 @@ Node *create_non_binary_tree_sequential(Node **nodes, int count) {
         for(int u = 0; u < MAX_NUM_OF_CHILDREN; u++) {
             node->children[u] = nodes[i+u];
         }
-
-        #pragma omp ordered
-        {
-            new_nodes[j++] = node;
-        }
+        new_nodes[j++] = node;
+        
     }
     
     if(count % MAX_NUM_OF_CHILDREN != 0) {
-        for(int u = count & MAX_NUM_OF_CHILDREN; u > 0; u--) {
+        for(int u = count % MAX_NUM_OF_CHILDREN; u > 0; u--) {
             new_nodes[j++] = nodes[count - u];
         }
     }
@@ -125,14 +120,6 @@ Node *create_non_binary_tree_parallel(Node **nodes, int count) {
         }
     }
 
-    //TODO: srediti ovo
-    /*if(count % 3 == 1) {
-        new_nodes[j++] = nodes[count - 1];
-    } else if (count % 3 == 2) {
-        new_nodes[j++] = nodes[count - 2];
-        new_nodes[j++] = nodes[count - 1];
-    }*/
-
     printf("\n\n");
 
     return create_non_binary_tree_parallel(new_nodes, j);
@@ -173,7 +160,9 @@ void print_tree(Node *root, int space) {
 
 int main() {
     unsigned char data[][HASH_SIZE] = {
-    {'a'}, {'b'}, {'c'}, {'d'}, {'e'}, {'f'}, {'g'}, {'h'}, {'i'}, {'j'}, {'k'}, {'l'}, {'m'}, {'n'}, {'q'}, {'m'}, {'n'}, {'q'}
+    {'a'}, {'b'}, {'c'}, {'m'}, {'n'}, {'a'}, {'b'}, {'c'}, {'a'}, {'b'}, {'c'}, {'k'}, {'a'}, {'b'}, {'c'}, {'m'}, {'n'}, {'a'}, {'b'}, {'c'}, {'a'}, {'b'}, {'c'}, {'k'},
+    {'a'}, {'b'}, {'c'}, {'m'}, {'n'}, {'a'}, {'b'}, {'c'}, {'a'}, {'b'}, {'c'}, {'k'}, {'a'}, {'b'}, {'c'}, {'m'}, {'n'}, {'a'}, {'b'}, {'c'}, {'a'}, {'b'}, {'c'}, {'k'},
+
     };
 
     int size = sizeof(data) / HASH_SIZE;
@@ -201,11 +190,11 @@ int main() {
 
     printf("Trajanje paralelnog koda: %lf\n\n", end - start);
 
-    print_tree(root, 0);
+    //print_tree(root, 0);
 
     //verification
     unsigned char data_proof[][HASH_SIZE] = {
-    {'a'}, {'b'}, {'c'}, {'d'}, {'e'}, {'f'}, {'g'}, {'h'}, {'i'}, {'j'}, {'k'}, {'l'}, {'m'}, {'n'}, {'q'}, {'m'}, {'n'}, {'q'}
+    {'a'}, {'b'}, {'c'}
     };
 
     Node *first_level_nodes_proof[size];
